@@ -1,0 +1,52 @@
+arch = "AArch64"
+name = "MPfree-16"
+symbolic = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "y"]
+
+[thread.0]
+init = { X1 = "x1", X2 = "x2", X3 = "x3", X4 = "x4", X5 = "x5", X6 = "x6", X7 = "x7", X8 = "x8", X9 = "x9", X10 = "x10", X11 = "x11", X12 = "x12", X13 = "x13", X14 = "x14", X15 = "x15", X16 = "x16", X17 = "y" }
+code = """
+	MOV W0,#1
+	STR W0,[X1]
+	STR W0,[X2]
+	STR W0,[X3]
+	STR W0,[X4]
+	STR W0,[X5]
+	STR W0,[X6]
+	STR W0,[X7]
+	STR W0,[X8]
+	STR W0,[X9]
+	STR W0,[X10]
+	STR W0,[X11]
+	STR W0,[X12]
+	STR W0,[X13]
+	STR W0,[X14]
+	STR W0,[X15]
+	STR W0,[X16]
+	STR W0,[X17]
+"""
+
+[thread.1]
+init = { X1 = "x1", X2 = "x2", X3 = "x3", X4 = "x4", X5 = "x5", X6 = "x6", X7 = "x7", X8 = "x8", X9 = "x9", X10 = "x10", X11 = "x11", X12 = "x12", X13 = "x13", X14 = "x14", X15 = "x15", X16 = "x16", X17 = "y" }
+code = """
+	LDR W17,[X17]
+	LDR W1,[X1]
+	LDR W2,[X2]
+	LDR W3,[X3]
+	LDR W4,[X4]
+	LDR W5,[X5]
+	LDR W6,[X6]
+	LDR W7,[X7]
+	LDR W8,[X8]
+	LDR W9,[X9]
+	LDR W10,[X10]
+	LDR W11,[X11]
+	LDR W12,[X12]
+	LDR W13,[X13]
+	LDR W14,[X14]
+	LDR W15,[X15]
+	LDR W16,[X16]
+"""
+
+[final]
+expect = "sat"
+assertion = "true"

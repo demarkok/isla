@@ -1,0 +1,36 @@
+arch = "AArch64"
+name = "MPn-8"
+symbolic = ["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "y"]
+
+[thread.0]
+init = { X1 = "x1", X2 = "x2", X3 = "x3", X4 = "x4", X5 = "x5", X6 = "x6", X7 = "x7", X8 = "x8", X9 = "y" }
+code = """
+	MOV W0,#1
+	STR W0,[X1]
+	STR W0,[X2]
+	STR W0,[X3]
+	STR W0,[X4]
+	STR W0,[X5]
+	STR W0,[X6]
+	STR W0,[X7]
+	STR W0,[X8]
+	STR W0,[X9]
+"""
+
+[thread.1]
+init = { X1 = "x1", X2 = "x2", X3 = "x3", X4 = "x4", X5 = "x5", X6 = "x6", X7 = "x7", X8 = "x8", X9 = "y" }
+code = """
+	LDR W9,[X9]
+	LDR W1,[X1]
+	LDR W2,[X2]
+	LDR W3,[X3]
+	LDR W4,[X4]
+	LDR W5,[X5]
+	LDR W6,[X6]
+	LDR W7,[X7]
+	LDR W8,[X8]
+"""
+
+[final]
+expect = "sat"
+assertion = "1:X9 = 1 & 1:X1 = 0 & 1:X2 = 0 & 1:X3 = 0 & 1:X4 = 0 & 1:X5 = 0 & 1:X6 = 0 & 1:X7 = 0 & 1:X8 = 0"

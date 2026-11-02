@@ -1,0 +1,89 @@
+// Consistent  <=>  internal, external, atomic, bad_co, bad_rf are all empty.
+.type Ev <: symbol
+
+// ---------- STATIC inputs (per candidate; smt_events.rs:604-932 + accessor tables)
+.decl R(e:Ev)            .input R
+.decl W(e:Ev)            .input W          // IW is NOT in W (stdlib.cat:6, smt_events.smt2:34)
+.decl ISB(e:Ev)          .input ISB
+.decl A(e:Ev)            .input A
+.decl Q(e:Ev)            .input Q
+.decl L(e:Ev)            .input L
+.decl is_dmb_ld(e:Ev)    .input is_dmb_ld
+.decl is_dmb_st(e:Ev)    .input is_dmb_st
+.decl is_dmb_full(e:Ev)  .input is_dmb_full
+.decl po(x:Ev,y:Ev)      .input po
+.decl po_loc(x:Ev,y:Ev)  .input po_loc(filename="po-loc.facts")
+.decl int(x:Ev,y:Ev)     .input int        // same thread, different instruction
+.decl loc(x:Ev,y:Ev)     .input loc        // distinct events, same address
+.decl addr(x:Ev,y:Ev)    .input addr
+.decl data(x:Ev,y:Ev)    .input data
+.decl ctrl(x:Ev,y:Ev)    .input ctrl
+.decl rmw(x:Ev,y:Ev)     .input rmw
+.decl amo(x:Ev,y:Ev)     .input amo
+
+// ---------- DYNAMIC inputs (what z3 decided)
+.decl rf(w:Ev,r:Ev)  .input rf    // one row per read; w may be "IW"
+.decl co(x:Ev,y:Ev)  .input co    // transitively closed total order per location, IW first
+
+// ---------- stdlib.cat:22-23, cos.cat:5-13
+.decl rfi(x:Ev,y:Ev)   rfi(x,y) :- rf(x,y), int(x,y).
+.decl rfe(x:Ev,y:Ev)   rfe(x,y) :- rf(x,y), !rfi(x,y).                    // rf \ rfi
+.decl invrf(x:Ev,y:Ev) invrf(x,y) :- rf(y,x).                             // rf^-1
+.decl coi(x:Ev,y:Ev)   coi(x,y) :- co(x,y), int(x,y).
+.decl coe(x:Ev,y:Ev)   coe(x,y) :- co(x,y), !coi(x,y).
+.decl fr(x:Ev,y:Ev)    fr(x,y) :- invrf(x,z), co(z,y), x != y, loc(x,y). // ((invrf; co) \ id) & loc
+.decl fri(x:Ev,y:Ev)   fri(x,y) :- fr(x,y), int(x,y).
+.decl fre(x:Ev,y:Ev)   fre(x,y) :- fr(x,y), !fri(x,y).
+
+// ---------- aarch64.cat:121-148
+.decl ca(x:Ev,y:Ev)   ca(x,y) :- fr(x,y).  ca(x,y) :- co(x,y).
+.decl obs(x:Ev,y:Ev)  obs(x,y) :- rfe(x,y). obs(x,y) :- fre(x,y). obs(x,y) :- coe(x,y).
+.decl dob(x:Ev,y:Ev)
+dob(x,y) :- addr(x,y).
+dob(x,y) :- data(x,y).
+dob(x,y) :- ctrl(x,y), W(y).                                    // ctrl; [W]
+dob(x,y) :- ctrl(x,i), ISB(i), po(i,y), R(y).                   // (ctrl | (addr; po)); [ISB]; po; [R]
+dob(x,y) :- addr(x,a), po(a,i), ISB(i), po(i,y), R(y).
+dob(x,y) :- addr(x,a), po(a,y), W(y).                           // addr; po; [W]
+dob(x,y) :- ctrl(x,w), coi(w,y).                                // (ctrl | data); coi
+dob(x,y) :- data(x,w), coi(w,y).
+dob(x,y) :- addr(x,w), rfi(w,y).                                // (addr | data); rfi
+dob(x,y) :- data(x,w), rfi(w,y).
+.decl aob(x:Ev,y:Ev)
+aob(x,y) :- rmw(x,y).
+aob(x,y) :- rmw(_,x), rfi(x,y), A(y).                           // [range(rmw)]; rfi; [A | Q]
+aob(x,y) :- rmw(_,x), rfi(x,y), Q(y).
+.decl bob(x:Ev,y:Ev)
+bob(x,y) :- po(x,f), is_dmb_full(f), po(f,y).                   // po; [is_dmb_full]; po
+bob(x,y) :- po(x,a), A(a), amo(a,l), L(l), po(l,y).             // po; [A]; amo; [L]; po
+bob(x,y) :- L(x), po(x,y), A(y).                                // [L]; po; [A]
+bob(x,y) :- R(x), po(x,f), is_dmb_ld(f), po(f,y).               // [R]; po; [is_dmb_ld]; po
+bob(x,y) :- A(x), po(x,y).                                      // [A | Q]; po
+bob(x,y) :- Q(x), po(x,y).
+bob(x,y) :- W(x), po(x,f), is_dmb_st(f), po(f,y), W(y).         // [W]; po; [is_dmb_st]; po; [W]
+bob(x,y) :- po(x,y), L(y).                                      // po; [L]
+bob(x,y) :- po(x,l), L(l), coi(l,y).                            // po; [L]; coi
+.decl ob(x:Ev,y:Ev)                                             // (obs|dob|aob|bob)^+, left-linear
+ob(x,y) :- obs(x,y).  ob(x,y) :- dob(x,y).  ob(x,y) :- aob(x,y).  ob(x,y) :- bob(x,y).
+ob(x,z) :- ob(x,y), obs(y,z).  ob(x,z) :- ob(x,y), dob(y,z).
+ob(x,z) :- ob(x,y), aob(y,z).  ob(x,z) :- ob(x,y), bob(y,z).
+
+// ---------- checks (aarch64.cat:151, 155, 158): consistent iff all three outputs are empty
+.decl internal_tc(x:Ev,y:Ev)                   // (po-loc | ca | rf)^+
+internal_tc(x,y) :- po_loc(x,y).  internal_tc(x,y) :- ca(x,y).  internal_tc(x,y) :- rf(x,y).
+internal_tc(x,z) :- internal_tc(x,y), po_loc(y,z).
+internal_tc(x,z) :- internal_tc(x,y), ca(y,z).
+internal_tc(x,z) :- internal_tc(x,y), rf(y,z).
+.decl internal(x:Ev)    .output internal       internal(x) :- internal_tc(x,x).
+.decl external(x:Ev)    .output external       external(x) :- ob(x,x).
+.decl atomic(x:Ev,y:Ev) .output atomic         atomic(x,y) :- rmw(x,y), fre(x,z), coe(z,y).
+
+// ---------- sanity checks on the input (z3 already enforces smt_events.smt2:12-78; these catch export bugs)
+.decl bad_co(x:Ev,y:Ev) .output bad_co
+bad_co(x,x) :- co(x,x).
+bad_co(x,z) :- co(x,y), co(y,z), !co(x,z).
+bad_co(x,y) :- W(x), W(y), x != y, loc(x,y), !co(x,y), !co(y,x).
+bad_co(x,y) :- co(x,y), !W(y).
+.decl bad_rf(w:Ev,r:Ev) .output bad_rf
+bad_rf(w1,r) :- rf(w1,r), rf(w2,r), w1 != w2.
+bad_rf("?",r) :- R(r), !rf(_,r).

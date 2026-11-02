@@ -1,0 +1,28 @@
+arch = "AArch64"
+name = "MPn-4"
+symbolic = ["x1", "x2", "x3", "x4", "y"]
+
+[thread.0]
+init = { X1 = "x1", X2 = "x2", X3 = "x3", X4 = "x4", X5 = "y" }
+code = """
+	MOV W0,#1
+	STR W0,[X1]
+	STR W0,[X2]
+	STR W0,[X3]
+	STR W0,[X4]
+	STR W0,[X5]
+"""
+
+[thread.1]
+init = { X1 = "x1", X2 = "x2", X3 = "x3", X4 = "x4", X5 = "y" }
+code = """
+	LDR W5,[X5]
+	LDR W1,[X1]
+	LDR W2,[X2]
+	LDR W3,[X3]
+	LDR W4,[X4]
+"""
+
+[final]
+expect = "sat"
+assertion = "1:X5 = 1 & 1:X1 = 0 & 1:X2 = 0 & 1:X3 = 0 & 1:X4 = 0"

@@ -1,0 +1,22 @@
+"AArch64 facts only"
+
+include "stdlib.cat"
+
+accessor is_dmb: bool = .match { Barrier_DMB => true, _ => false }
+accessor is_dsb: bool = .match { Barrier_DSB => true, _ => false }
+accessor is_isb: bool = .match { Barrier_ISB => true, _ => false }
+
+define ISB(ev: Event): bool = is_isb(ev)
+
+accessor barrier_domain: MBReqDomain = .match { Barrier_DSB => .domain, Barrier_DMB => .domain, _ => default }
+accessor barrier_types: MBReqTypes = .match { Barrier_DSB => .types, Barrier_DMB => .types, _ => default }
+
+accessor ak_strength: Access_strength = .access_kind.match { AK_explicit => .strength, _ => default }
+
+define A(ev: Event): bool = R(ev) & (ak_strength(ev) == AS_rel_or_acq)
+define Q(ev: Event): bool = R(ev) & (ak_strength(ev) == AS_acq_rcpc)
+define L(ev: Event): bool = W(ev) & (ak_strength(ev) == AS_rel_or_acq)
+
+define is_dmb_ld(ev: Event): bool = is_dmb(ev) & (barrier_types(ev) == MBReqTypes_Reads)
+define is_dmb_st(ev: Event): bool = is_dmb(ev) & (barrier_types(ev) == MBReqTypes_Writes)
+define is_dmb_full(ev: Event): bool = is_dmb(ev) & (barrier_types(ev) == MBReqTypes_All)

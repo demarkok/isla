@@ -1,0 +1,68 @@
+arch = "AArch64"
+name = "MPsame-16"
+symbolic = ["x", "y"]
+
+[thread.0]
+init = { X1 = "x", X3 = "y" }
+code = """
+	MOV W0,#1
+	STR W0,[X1]
+	MOV W0,#2
+	STR W0,[X1]
+	MOV W0,#3
+	STR W0,[X1]
+	MOV W0,#4
+	STR W0,[X1]
+	MOV W0,#5
+	STR W0,[X1]
+	MOV W0,#6
+	STR W0,[X1]
+	MOV W0,#7
+	STR W0,[X1]
+	MOV W0,#8
+	STR W0,[X1]
+	MOV W0,#9
+	STR W0,[X1]
+	MOV W0,#10
+	STR W0,[X1]
+	MOV W0,#11
+	STR W0,[X1]
+	MOV W0,#12
+	STR W0,[X1]
+	MOV W0,#13
+	STR W0,[X1]
+	MOV W0,#14
+	STR W0,[X1]
+	MOV W0,#15
+	STR W0,[X1]
+	MOV W0,#16
+	STR W0,[X1]
+	MOV W0,#1
+	STR W0,[X3]
+"""
+
+[thread.1]
+init = { X1 = "x", X3 = "y" }
+code = """
+	LDR W2,[X3]
+	LDR W4,[X1]
+	LDR W5,[X1]
+	LDR W6,[X1]
+	LDR W7,[X1]
+	LDR W8,[X1]
+	LDR W9,[X1]
+	LDR W10,[X1]
+	LDR W11,[X1]
+	LDR W12,[X1]
+	LDR W13,[X1]
+	LDR W14,[X1]
+	LDR W15,[X1]
+	LDR W16,[X1]
+	LDR W17,[X1]
+	LDR W18,[X1]
+	LDR W19,[X1]
+"""
+
+[final]
+expect = "sat"
+assertion = "1:X2 = 1 & 1:X4 = 0 & 1:X5 = 0 & 1:X6 = 0 & 1:X7 = 0 & 1:X8 = 0 & 1:X9 = 0 & 1:X10 = 0 & 1:X11 = 0 & 1:X12 = 0 & 1:X13 = 0 & 1:X14 = 0 & 1:X15 = 0 & 1:X16 = 0 & 1:X17 = 0 & 1:X18 = 0 & 1:X19 = 0"
