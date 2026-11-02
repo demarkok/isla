@@ -189,7 +189,7 @@ fn make_cmdline_opts() -> getopts::Options {
         "A directory to cache intermediate results. The default is TMPDIR if set, otherwise /tmp",
         "<path>",
     );
-
+    opts.optopt("", "engine", ".dl file, a Souffle program that replaces .cat checks; the .cat file (-m) should not have let-derived relations and acyclic/irreflexive/empty checks", "<path>");
     opts
 }
 
@@ -410,6 +410,8 @@ fn isla_main() -> i32 {
 
     let exhaustive = matches.opt_present("exhaustive");
     let force_kind = matches.opt_str("force-kind").map(|s| FinalKind::from_str(&s));
+
+    let engine: &Option<String> = &matches.opt_str("engine");
 
     let timeout: Option<u64> = match matches.opt_get("timeout") {
         Ok(timeout) => timeout,
@@ -684,6 +686,7 @@ fn isla_main() -> i32 {
                         armv8_page_tables,
                         merge_translations,
                         remove_uninteresting_translates,
+                        engine: engine.clone(),
                     };
 
                     let mut graph_show_regs: HashSet<String> =
