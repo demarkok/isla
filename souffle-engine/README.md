@@ -1,9 +1,9 @@
 # Souffle as the memory-model checker for isla-axiomatic
 
 Standard isla produces one SMT problem per candidate, consisting of:
-- ISA semantics ()
-- `rf`/`co` axioms
-- .cat model (closures and acyclicity checks).
+- ISA semantics (events, register values, path conditions, etc.)
+- `rf`/`co` well-formedness axioms (e.g. co is a total order per location)
+- .cat model (closures and acyclicity checks)
 
 In this experiment,  we carve out the checks out of the SMT problem and run them in Souffle instead:
 - isla symbolically executes the program, produces the candidate execution (events).
