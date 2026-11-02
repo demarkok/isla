@@ -5,12 +5,14 @@ Standard isla produces one SMT problem per candidate, consisting of:
 - `rf`/`co` well-formedness axioms (e.g. co is a total order per location)
 - .cat model (closures and acyclicity checks)
 
-In this experiment,  we carve out the checks out of the SMT problem and run them in Souffle instead:
+In this experiment, we carve out the checks out of the SMT problem and run them in Souffle instead:
 - isla symbolically executes the program, produces the candidate execution (events).
 - z3 gets an SMT problem with relation definitions and well-formedness (e.g. same-location) but no memory-model restrictions (i.e. no irreflexivity of ob).
 - z3 proposes well-formed `rf` and `co`, which, however, may violate the memory model.
 - The static relations and sets (`po`, `R`, etc.) and the proposed `rf`/`co` are written as datalog facts and fed into Souffle, which checks the memory-model restrictions. 
 - If the execution is rejected by Souffle, isla adds a refuctation of the proposed `rf`+`co` to the SMT problem and asks z3 for another execution.
+
+The substantive changes are in the per-candidate loop in `isla-axiomatic/src/run_litmus.rs`.
 
 ## Files
 - `aarch64-facts.cat`: the cat file without memory model restrictions, so that z3 gives `rf` and `co` without checks.
