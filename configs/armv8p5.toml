@@ -17,7 +17,7 @@ arch = "aarch64"
 assembler = "as --target=aarch64-unknown-linux-gnu"
 objdump = "/opt/homebrew/opt/llvm/bin/llvm-objdump"
 nm = "/opt/homebrew/opt/llvm/bin/llvm-nm"
-linker = "/opt/homebrew/opt/llvm/bin/ld.lld"
+linker = "/opt/homebrew/bin/ld.lld"
 
 [[toolchain]]
 name = "default"
