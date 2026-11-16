@@ -52,7 +52,7 @@ use isla_axiomatic::litmus::exp::{collect_locs, Exp, Loc as LitmusLoc};
 use isla_axiomatic::litmus::{FinalKind, Litmus};
 use isla_axiomatic::page_table::{name_initial_walk_bitvectors, VirtualAddress};
 use isla_axiomatic::run_litmus;
-use isla_axiomatic::run_litmus::{LitmusRunOpts, PCLimitMode};
+use isla_axiomatic::run_litmus::{Engine, LitmusRunOpts, PCLimitMode};
 use isla_lib::bitvector::{b129::B129, BV};
 use isla_lib::config::ISAConfig;
 use isla_lib::error::IslaError;
@@ -189,7 +189,18 @@ fn make_cmdline_opts() -> getopts::Options {
         "A directory to cache intermediate results. The default is TMPDIR if set, otherwise /tmp",
         "<path>",
     );
-    opts.optopt("", "engine", ".dl file, a Souffle program that replaces .cat checks; the .cat file (-m) should not have let-derived relations and acyclic/irreflexive/empty checks", "<path>");
+    opts.optopt(
+        "",
+        "engine",
+        "run the memory model checks in a relational engine instead of z3; the .cat file (-m) should not have let-derived relations and acyclic/irreflexive/empty checks",
+        "<souffle|coln>",
+    );
+    opts.optopt(
+        "",
+        "engine-file",
+        "the checks for --engine: a Souffle program (.dl), or a compiled Coln driver (.js)",
+        "<path>",
+    );
     opts
 }
 
@@ -411,7 +422,22 @@ fn isla_main() -> i32 {
     let exhaustive = matches.opt_present("exhaustive");
     let force_kind = matches.opt_str("force-kind").map(|s| FinalKind::from_str(&s));
 
-    let engine: &Option<String> = &matches.opt_str("engine");
+    let engine = match (matches.opt_str("engine"), matches.opt_str("engine-file").map(PathBuf::from)) {
+        (Some(engine), Some(engine_file)) => Some(match engine.as_str() {
+            "souffle" => Engine::Souffle(engine_file),
+            "coln" => Engine::Coln(engine_file),
+            _ => {
+                eprintln!("Unknown engine '{}', must be one of {{souffle, coln}}", engine);
+                return 1;
+            }
+        }),
+        (None, None) => None,
+        (Some(_), None) | (None, Some(_)) => {
+            eprintln!("--engine and --engine-file must be given together");
+            return 1;
+        }
+    };
+    let engine = &engine;
 
     let timeout: Option<u64> = match matches.opt_get("timeout") {
         Ok(timeout) => timeout,

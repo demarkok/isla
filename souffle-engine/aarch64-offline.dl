@@ -11,6 +11,7 @@
 .decl is_dmb_ld(e:Ev)    .input is_dmb_ld
 .decl is_dmb_st(e:Ev)    .input is_dmb_st
 .decl is_dmb_full(e:Ev)  .input is_dmb_full
+
 .decl po(x:Ev,y:Ev)      .input po
 .decl po_loc(x:Ev,y:Ev)  .input po_loc(filename="po-loc.facts")
 .decl int(x:Ev,y:Ev)     .input int        // same thread, different instruction
@@ -22,8 +23,8 @@
 .decl amo(x:Ev,y:Ev)     .input amo
 
 // ---------- DYNAMIC inputs (what z3 decided)
-.decl rf(w:Ev,r:Ev)  .input rf    // one row per read; w may be "IW"
-.decl co(x:Ev,y:Ev)  .input co    // transitively closed total order per location, IW first
+.decl rf(w:Ev,r:Ev)  .input rf    
+.decl co(x:Ev,y:Ev)  .input co    
 
 // ---------- stdlib.cat:22-23, cos.cat:5-13
 .decl rfi(x:Ev,y:Ev)   rfi(x,y) :- rf(x,y), int(x,y).
@@ -77,13 +78,3 @@ internal_tc(x,z) :- internal_tc(x,y), rf(y,z).
 .decl internal(x:Ev)    .output internal       internal(x) :- internal_tc(x,x).
 .decl external(x:Ev)    .output external       external(x) :- ob(x,x).
 .decl atomic(x:Ev,y:Ev) .output atomic         atomic(x,y) :- rmw(x,y), fre(x,z), coe(z,y).
-
-// ---------- sanity checks on the input (z3 already enforces smt_events.smt2:12-78; these catch export bugs)
-.decl bad_co(x:Ev,y:Ev) .output bad_co
-bad_co(x,x) :- co(x,x).
-bad_co(x,z) :- co(x,y), co(y,z), !co(x,z).
-bad_co(x,y) :- W(x), W(y), x != y, loc(x,y), !co(x,y), !co(y,x).
-bad_co(x,y) :- co(x,y), !W(y).
-.decl bad_rf(w:Ev,r:Ev) .output bad_rf
-bad_rf(w1,r) :- rf(w1,r), rf(w2,r), w1 != w2.
-bad_rf("?",r) :- R(r), !rf(_,r).

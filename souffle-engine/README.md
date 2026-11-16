@@ -1,6 +1,6 @@
 # Souffle as the memory-model checker for isla-axiomatic
 
-Standard isla produces one SMT problem per candidate, consisting of:
+Standard isla produces one SMT problem per candidate. The SMT problem has 3 logical parts:
 - ISA semantics (events, register values, path conditions, etc.)
 - `rf`/`co` well-formedness axioms (e.g. co is a total order per location)
 - .cat model (closures and acyclicity checks)
@@ -27,13 +27,20 @@ AArch64 toolchain (`--toolchain macos-aarch64` on a Mac).
 ```
 I=./target/release/isla-axiomatic
 A="-A /path/to/armv8p5.ir -C configs/armv8p5.toml --cache /tmp/isla-cache"
-E="-m souffle-engine/aarch64-facts.cat --engine souffle-engine/aarch64-offline.dl"
+E="-m souffle-engine/aarch64-facts.cat --engine souffle --engine-file souffle-engine/aarch64-offline.dl"
 F="-m web/client/dist/aarch64.cat"      # the full model in z3, for comparison
 
 $I $A $E souffle-engine/tests/MP+dmb.sys.toml      # forbidden, 2 rounds; --verbose shows them
 $I $A $F souffle-engine/tests/MP+dmb.sys.toml      # same verdict from the full model
 $I $A $E --extra-smt souffle-engine/uniproc.smt2 souffle-engine/tests/MPsame-4+dmb.toml
 ```
+
+The engine is chosen with `--engine souffle|coln`, and `--engine-file` names its program. isla
+runs it once per proposed `rf`/`co` and reads every `.csv` file it writes: the execution is
+consistent iff all of them are empty. So a new `.output` relation in the `.dl` file is a new
+check, with no change to isla. The same loop with Coln as the engine is in
+[`../coln-engine`](../coln-engine/README.md).
+
 
 ## Benchmarks (by Claude)
 
@@ -45,7 +52,7 @@ the par-or tactic for every z3 call, z3 capped at 60 s per call ("timeout"):
   as transitive-closure axioms.
 - **z3, Int clocks**: this branch's binary with the `acyclic` checks encoded as integer clocks
   (PR rems-project/isla#108, cat rewritten to `acyclic obs | dob | aob | bob as external`).
-- **Souffle engine**: this branch, `-m aarch64-facts.cat --engine aarch64-offline.dl
+- **Souffle engine**: this branch, `-m aarch64-facts.cat --engine souffle --engine-file aarch64-offline.dl
   --extra-smt uniproc.smt2`. "rounds" is the number of z3 answers, so for FORK and ENUM it
   includes one per candidate or enumerated execution plus one per rejected proposal.
 
@@ -93,4 +100,3 @@ assertion (`rf` free for every read); FORK-K puts K `CBNZ` on loaded values in t
 - In these cases, the cost is the number of rounds: every inconsistent proposal is one more round.
 - It can be sped up with provenance, when instead of the whole `rf`/`co` relation, only the problematic cycle is blocked for the next rounds, this way more bad executions are rejected in one round. 
 - This approach does not speed up the MMU model (Nils's page table tests). Without the acyclicity axioms, z3 takes 10-20x time to propose a single execution (probably because the executions are rejected at a much later stage, by non-MM-specific checks). 
-

@@ -36,7 +36,7 @@ use std::fs::File;
 use std::io::Write;
 use std::io::{BufRead, BufReader};
 use std::process::Stdio;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 use std::thread;
@@ -159,9 +159,36 @@ pub struct LitmusRunOpts {
     /// translation does not read from the initial state
     pub remove_uninteresting_translates: Option<bool>,
 
-    /// .dl file with the checks that are removed from .cat.
-    /// Delegates those checks to Souffle. 
-    pub engine: Option<String>,
+    /// The relational engine that runs the checks removed from the .cat file.
+    pub engine: Option<Engine>,
+}
+
+/// An external program that checks one candidate execution. It is given a directory of
+/// `NAME.facts` files and an output directory, where it writes one `CHECK.csv` per check.
+/// The candidate is consistent iff every `.csv` file is empty.
+#[derive(Clone, Debug)]
+pub enum Engine {
+    /// A Souffle program (.dl), run as `souffle FILE -F facts_dir -D out_dir`
+    Souffle(PathBuf),
+    /// A compiled Coln driver (.js), run as `node FILE facts_dir out_dir`
+    Coln(PathBuf),
+}
+
+impl Engine {
+    pub fn command(&self, facts_dir: &Path, out_dir: &Path) -> Command {
+        match self {
+            Engine::Souffle(dl) => {
+                let mut c = Command::new("souffle");
+                c.arg(dl).arg("-F").arg(facts_dir).arg("-D").arg(out_dir);
+                c
+            }
+            Engine::Coln(js) => {
+                let mut c = Command::new("node");
+                c.arg(js).arg(facts_dir).arg(out_dir);
+                c
+            }
+        }
+    }
 }
 
 pub struct LitmusRunInfo {
@@ -836,7 +863,7 @@ where
             // This way, after this if, `sat` means the execution is consistent,
             // `unsat` means we have exhausted all consistent executions (could be none of them)
             if let Some(engine) = &opts.engine {
-                log!(log::VERBOSE, &format!("engine {}", engine));
+                log!(log::VERBOSE, &format!("engine {:?}", engine));
                 log!(log::VERBOSE, &format!("z3 {}", z3_output.lines().next().unwrap_or("")));
 
                 if let Some(model_buf) = z3_output.strip_prefix("sat") {
@@ -878,6 +905,25 @@ where
                         }
                     }
 
+                    // An engine without negation writes `rf & nonint` for the cat's `rf \ rfi`.
+                    // `nonint` is the complement of `int` on distinct events, IW included. `ext` is
+                    // not that: pairs with IW, and two events of one instruction, are in neither.
+                    {
+                        let int: HashSet<(&str, &str)> = model
+                            .interpret_rel("int")
+                            .map_err(|_| CallbackError::Internal("Could not interpret int relation".to_string()))?
+                            .into_iter()
+                            .collect();
+                        let mut fd = File::create(facts_dir.join("nonint.facts")).map_err(internal_err)?;
+                        for a in event_names.iter() {
+                            for b in event_names.iter() {
+                                if a != b && !int.contains(&(*a, *b)) {
+                                    writeln!(&mut fd, "{}\t{}", a, b).map_err(internal_err)?;
+                                }
+                            }
+                        }
+                    }
+
                     for set in EXPORT_SETS {
                         let mut fd = File::create(facts_dir.join(format!("{}.facts",set))).map_err(internal_err)?;
                         let rows = model.interpret_set(set).map_err(|_| {
@@ -890,30 +936,38 @@ where
 
                     log!(log::VERBOSE, &format!("facts written to {}", facts_dir.display()));
 
-                    const ENGINE_CHECKS: &[&str] = &["internal", "external", "atomic", "bad_co", "bad_rf"];
-
                     let out_dir = facts_dir.join("out");
                     std::fs::create_dir_all(&out_dir).map_err(internal_err)?;
 
-                    let mut souffle_command = Command::new("souffle");
-                    souffle_command.arg(engine);
-                    souffle_command.arg("-F").arg(&facts_dir);
-                    souffle_command.arg("-D").arg(&out_dir);
-                    let souffle = souffle_command.output().map_err(internal_err)?;
-                    if !souffle.status.success() {
+                    let output = engine.command(&facts_dir, &out_dir).output().map_err(internal_err)?;
+                    if !output.status.success() {
                         return Err(CallbackError::Internal(format!(
-                            "souffle failed: {}", String::from_utf8_lossy(&souffle.stderr))));
+                            "engine failed: {}", String::from_utf8_lossy(&output.stderr))));
                     }
+
+                    // Every .csv file the engine wrote is a check: non-empty means violated.
                     let mut consistent = true;
-                    for check in ENGINE_CHECKS {
-                        let csv = std::fs::read_to_string(out_dir.join(format!("{}.csv", check))).map_err(internal_err)?;
+                    let mut no_checks = true;
+                    for entry in std::fs::read_dir(&out_dir).map_err(internal_err)? {
+                        let path = entry.map_err(internal_err)?.path();
+                        if path.extension().and_then(|e| e.to_str()) != Some("csv") {
+                            continue;
+                        }
+                        no_checks = false;
+                        let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
+                        let csv = std::fs::read_to_string(&path).map_err(internal_err)?;
                         if !csv.trim().is_empty() {
                             consistent = false;
-                            log!(log::VERBOSE, &format!("souffle check {} violated:\n{}", check, csv));
+                            log!(log::VERBOSE, &format!("engine check {} violated:\n{}", name, csv));
                         }
                     }
-                    log!(log::VERBOSE, &format!("souffle took: {}ms", now.elapsed().as_millis()));
-                    log!(log::VERBOSE, &format!("souffle consistent: {}", consistent));
+                    // An engine that crashed silently must not pass as consistent
+                    if no_checks {
+                        return Err(CallbackError::Internal("engine wrote no .csv".to_string()));
+                    }
+
+                    log!(log::VERBOSE, &format!("engine took: {}ms", now.elapsed().as_millis()));
+                    log!(log::VERBOSE, &format!("engine consistent: {}", consistent));
 
                     if !consistent {
                         let mut rf_co_clauses: Vec<String> = Vec::new();
