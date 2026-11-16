@@ -1,0 +1,160 @@
+# Given by isla
+theory Exec := sig
+    Ev : Set
+    R : Ev -> Prop
+    W : Ev -> Prop
+    ISB : Ev -> Prop
+    A : Ev -> Prop
+    Q : Ev -> Prop
+    L : Ev -> Prop
+    is-dmb-ld : Ev -> Prop
+    is-dmb-st : Ev -> Prop
+    is-dmb-full : Ev -> Prop
+
+    rf : Ev -> Ev -> Prop
+    co : Ev -> Ev -> Prop
+    po : Ev -> Ev -> Prop
+    po-loc : Ev -> Ev -> Prop
+    int : Ev -> Ev -> Prop
+    nonint : Ev -> Ev -> Prop
+    loc : Ev -> Ev -> Prop
+    addr : Ev -> Ev -> Prop
+    data : Ev -> Ev -> Prop
+    ctrl : Ev -> Ev -> Prop
+    rmw : Ev -> Ev -> Prop
+    amo : Ev -> Ev -> Prop
+end
+
+theory Derived (^i X : Exec) := sig
+
+    # standard axiomaticMM relations
+    # stdlib.cat, cos.cat
+    # rfi, rfe, coi, coe, fr, fri, fre
+    rfi : X.Ev -> X.Ev -> Prop
+    rfi-def : (x y : X.Ev) -> X.rf x y -> X.int x y -> rfi x y
+
+    rfe : X.Ev -> X.Ev -> Prop
+    rfe-def : (x y : X.Ev) -> X.rf x y -> X.nonint x y -> rfe x y
+
+    coi : X.Ev -> X.Ev -> Prop
+    coi-def : (x y : X.Ev) -> X.co x y -> X.int x y -> coi x y
+
+    coe : X.Ev -> X.Ev -> Prop
+    coe-def : (x y : X.Ev) -> X.co x y -> X.nonint x y -> coe x y
+
+    fr : X.Ev -> X.Ev -> Prop
+    fr-def : (w r w2 : X.Ev) -> X.rf w r -> X.co w w2 -> X.loc r w2 -> fr r w2
+
+    fri : X.Ev -> X.Ev -> Prop
+    fri-def : (x y : X.Ev) -> fr x y -> X.int x y -> fri x y
+
+    fre : X.Ev -> X.Ev -> Prop
+    fre-def : (x y : X.Ev) -> fr x y -> X.nonint x y -> fre x y
+
+    # aarch64.cat
+    # (* Coherence-after *)
+    # let ca = fr | co
+    ca : X.Ev -> X.Ev -> Prop
+    # ca-def : (x y : X.Ev) -> Either (fr x y) (co x y) -> ca x y
+    ca-def-fr : (x y : X.Ev) -> fr x y -> ca x y
+    ca-def-co : (x y : X.Ev) -> X.co x y -> ca x y
+
+    # (* Observed-by *)
+    # let obs = rfe | fre | coe
+    obs : X.Ev -> X.Ev -> Prop
+    obs-def-rfe : (x y : X.Ev) -> rfe x y -> obs x y
+    obs-def-fre : (x y : X.Ev) -> fre x y -> obs x y
+    obs-def-coe : (x y : X.Ev) -> coe x y -> obs x y
+
+    # (* Dependency-ordered-before *)
+    # let dob = addr | data
+    #     | ctrl; [W]
+    #     | (ctrl | (addr; po)); [ISB]; po; [R]
+    #     | addr; po; [W]
+    #     | (ctrl | data); coi
+    #     | (addr | data); rfi
+    dob : X.Ev -> X.Ev -> Prop
+    dob-def-addr : (x y : X.Ev) -> X.addr x y -> dob x y
+    dob-def-data : (x y : X.Ev) -> X.data x y -> dob x y
+    dob-def-ctrlW : (x y : X.Ev) -> X.ctrl x y -> X.W y -> dob x y
+    dob-def-b1 : (x y z : X.Ev) -> X.ctrl x y -> X.ISB y -> X.po y z -> X.R z -> dob x z
+    dob-def-b2 : (x y z w : X.Ev) -> X.addr x y -> X.po y z -> X.ISB z -> X.po z w -> X.R w -> dob x w
+    dob-def-apo : (x y z : X.Ev) -> X.addr x y -> X.po y z -> X.W z -> dob x z
+    dob-def-coi1 : (x y z : X.Ev) -> X.ctrl x y -> coi y z -> dob x z
+    dob-def-coi2 : (x y z : X.Ev) -> X.data x y -> coi y z -> dob x z
+    dob-def-rfi1 : (x y z : X.Ev) -> X.addr x y -> rfi y z -> dob x z
+    dob-def-rfi2 : (x y z : X.Ev) -> X.data x y -> rfi y z -> dob x z
+
+    # (* Atomic-ordered-before *)
+    # let aob = rmw
+    #     | [range(rmw)]; rfi; [A | Q]
+    aob : X.Ev -> X.Ev -> Prop
+    aob-def-rmw : (x y : X.Ev) -> X.rmw x y -> aob x y
+    aob-def-rfi1 : (x y z : X.Ev) -> X.rmw x y -> rfi y z -> X.A z -> aob y z
+    aob-def-rfi2 : (x y z : X.Ev) -> X.rmw x y -> rfi y z -> X.Q z -> aob y z
+
+    # (* Barrier-ordered-before *)
+    # let bob = po; ([is_dmb_full]|([A];amo;[L])); po
+    #     | [L]; po; [A]
+    #     | [R]; po; [is_dmb_ld]; po
+    #     | [A | Q]; po
+    #     | [W]; po; [is_dmb_st]; po; [W]
+    #     | po; [L]
+    #     | po; [L]; coi
+    bob : X.Ev -> X.Ev -> Prop
+    bob-def-b1 : (x y z : X.Ev) -> X.po x y -> X.is-dmb-full y -> X.po y z -> bob x z
+    bob-def-b2 : (x y z w : X.Ev) -> X.po x y -> X.A y -> X.amo y z -> X.L z -> X.po z w -> bob x w 
+    bob-def-la : (x y : X.Ev) -> X.L x -> X.po x y -> X.A y -> bob x y
+    bob-def-ld : (x y z : X.Ev) -> X.R x -> X.po x y -> X.is-dmb-ld y -> X.po y z -> bob x z
+    bob-def-a : (x y : X.Ev) -> X.A x -> X.po x y -> bob x y
+    bob-def-q : (x y : X.Ev) -> X.Q x -> X.po x y -> bob x y
+    bob-def-st : (x y z : X.Ev) -> X.W x -> X.po x y -> X.is-dmb-st y -> X.po y z -> X.W z -> bob x z
+    bob-def-l : (x y : X.Ev) -> X.po x y -> X.L y -> bob x y
+    bob-def-coi : (x y z : X.Ev) -> X.po x y -> X.L y -> coi y z -> bob x z
+
+    ob1 : X.Ev -> X.Ev -> Prop
+    ob1-def-obs : (x y : X.Ev) -> obs x y -> ob1 x y
+    ob1-def-dob : (x y : X.Ev) -> dob x y -> ob1 x y
+    ob1-def-aob : (x y : X.Ev) -> aob x y -> ob1 x y
+    ob1-def-bob : (x y : X.Ev) -> bob x y -> ob1 x y
+
+    ob : X.Ev -> X.Ev -> Prop
+    ob-def-incl : (x y : X.Ev) -> ob1 x y -> ob x y
+    ob-def-trans : (x y z : X.Ev) -> ob x y -> ob y z -> ob x z
+end
+
+# consistent <=> external, internal, and atomic are false
+theory Axioms (^i X : Exec) (^i D : Derived X) := sig
+
+    # (* External visibility requirement *)
+    # (* irreflexive ob as external *)
+    external : Prop
+    external-def : (x : X.Ev) -> D.ob x x -> external
+
+    int : (x y : X.Ev) -> Prop
+    int-def1 : (x y : X.Ev) -> X.po-loc x y -> int x y
+    int-def2 : (x y : X.Ev) -> D.ca x y -> int x y
+    int-def3 : (x y : X.Ev) -> X.rf x y -> int x y
+    int-def-tc : (x y z : X.Ev) -> int x y -> int y z -> int x z
+
+
+    # (* Internal visibility requirement *)
+    # acyclic po-loc | ca | rf as internal
+    internal : Prop
+    internal-def : (x : X.Ev) -> int x x -> internal
+
+    # (* Atomic: Basic LDXR/STXR constraint to forbid intervening writes. *)
+    # empty rmw & (fre; coe) as atomic
+    atomic : Prop
+    atomic-def : (x y z : X.Ev) -> X.rmw x z -> D.fre x y -> D.coe y z -> atomic
+end
+
+
+realm AArch64 @ Exec
+    ind def derived : Derived root := init (Derived root)
+    ind def axioms : Axioms root derived := init (Axioms root derived)
+
+    ind def check-false-external : Prop := axioms.external
+    ind def check-false-internal : Prop := axioms.internal
+    ind def check-false-atomic : Prop := axioms.atomic
+end

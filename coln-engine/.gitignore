@@ -1,0 +1,14 @@
+# symlink to a built Coln checkout (see README.md)
+/coln
+# installed and compiled
+node_modules/
+dist/
+# generated from aarch64-offline.coln by the Coln compiler
+/AArch64.ts
+/AArch64.json
+/AArch64.pretty
+# generated from slow-test/slow.coln (listed one by one: on macOS git ignores case, and Slow.* would match slow.coln)
+/slow-test/Slow.ts
+/slow-test/Slow.js
+/slow-test/Slow.json
+/slow-test/Slow.pretty

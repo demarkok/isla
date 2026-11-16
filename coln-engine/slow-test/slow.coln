@@ -1,0 +1,13 @@
+theory Graph := sig
+    V : Set
+    e : V -> V -> Prop
+end
+
+theory Paths (^i G : Graph) := sig
+    p : G.V -> G.V -> Prop
+    p-def : (x y z w : G.V) -> G.e x y -> G.e y z -> G.e z w -> p x w
+end
+
+realm Slow @ Graph
+    ind def paths : Paths root := init (Paths root)
+end
