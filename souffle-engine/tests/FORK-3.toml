@@ -1,0 +1,32 @@
+# Thread 1 reads and branches, so isla proposes 8 candidates
+
+arch = "AArch64"
+name = "FORK-3"
+symbolic = ["x", "y"]
+
+[thread.0]
+init = { X3 = "y", X1 = "x" }
+code = """
+	MOV W0,#1
+	STR W0,[X1]
+	MOV W2,#1
+	STR W2,[X3]
+"""
+
+[thread.1]
+init = { X3 = "x", X1 = "y" }
+code = """
+	LDR W0,[X1]
+	CBNZ W0,L0
+L0:
+	LDR W2,[X3]
+	CBNZ W2,L1
+L1:
+	LDR W4,[X1]
+	CBNZ W4,L2
+L2:
+"""
+
+[final]
+expect = "sat"
+assertion = "true"

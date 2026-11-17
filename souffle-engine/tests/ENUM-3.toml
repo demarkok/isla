@@ -1,0 +1,26 @@
+# with -e, there are 8 possible executions
+
+arch = "AArch64"
+name = "ENUM-3"
+symbolic = ["x1", "x2", "x3"]
+
+[thread.0]
+init = { X1 = "x1", X2 = "x2", X3 = "x3" }
+code = """
+	MOV W0,#1
+	STR W0,[X1]
+	STR W0,[X2]
+	STR W0,[X3]
+"""
+
+[thread.1]
+init = { X1 = "x1", X2 = "x2", X3 = "x3" }
+code = """
+	LDR W1,[X1]
+	LDR W2,[X2]
+	LDR W3,[X3]
+"""
+
+[final]
+expect = "sat"
+assertion = "true"

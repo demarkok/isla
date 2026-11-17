@@ -52,6 +52,7 @@ use isla_axiomatic::litmus::exp::{collect_locs, Loc as LitmusLoc};
 use isla_axiomatic::litmus::Litmus;
 use isla_axiomatic::page_table::{name_initial_walk_bitvectors, VirtualAddress};
 use isla_axiomatic::run_litmus;
+use isla_axiomatic::run_litmus::Engine;
 use isla_axiomatic::run_litmus::{LitmusRunOpts, PCLimitMode};
 use isla_lib::bitvector::{b129::B129, BV};
 use isla_lib::config::ISAConfig;
@@ -188,7 +189,7 @@ fn make_cmdline_opts() -> getopts::Options {
         "A directory to cache intermediate results. The default is TMPDIR if set, otherwise /tmp",
         "<path>",
     );
-
+    opts.optopt("", "engine", "check each execution with `<command> FACTS_DIR OUT_DIR` instead of z3", "<command>");
     opts
 }
 
@@ -408,6 +409,13 @@ fn isla_main() -> i32 {
 
     let exhaustive = matches.opt_present("exhaustive");
 
+    let engine_command: Option<Vec<String>> =
+        matches.opt_str("engine").map(|command| command.split_whitespace().map(String::from).collect());
+    if engine_command.as_ref().is_some_and(|command| command.is_empty()) {
+        eprintln!("--engine needs a command");
+        return 1;
+    }
+
     let timeout: Option<u64> = match matches.opt_get("timeout") {
         Ok(timeout) => timeout,
         Err(e) => {
@@ -481,6 +489,21 @@ fn isla_main() -> i32 {
         return 1;
     }
 
+    // The names in the `show` declarations of the memory model
+    let mut mm_shows: Vec<String> = Vec::new();
+    for name in mm.shows().map(|name| mm_symtab[name].to_string()) {
+        if !mm_shows.contains(&name) {
+            mm_shows.push(name)
+        }
+    }
+
+    let engine: Option<Engine> = engine_command.map(|command| Engine { command });
+    if engine.is_some() && mm_shows.is_empty() {
+        eprintln!("--engine: the memory model has no `show` declarations");
+        return 1;
+    }
+    let engine = &engine;
+
     let extra_smt = match matches
         .opt_strs("extra-smt")
         .iter()
@@ -539,6 +562,7 @@ fn isla_main() -> i32 {
             let mm_compiled = &mm_compiled;
             let mm_symtab = &mm_symtab;
             let accessors = &accessors;
+            let mm_shows = &mm_shows;
             let extra_smt = &extra_smt;
             let graph_shows = graph_shows.as_ref();
             let graph_padding = graph_padding.as_ref();
@@ -658,6 +682,7 @@ fn isla_main() -> i32 {
                         armv8_page_tables,
                         merge_translations,
                         remove_uninteresting_translates,
+                        engine: engine.clone(),
                     };
 
                     let mut graph_show_regs: HashSet<String> =
@@ -713,6 +738,7 @@ fn isla_main() -> i32 {
                         mm_compiled,
                         mm_symtab,
                         accessors,
+                        mm_shows,
                         extra_smt,
                         check_sat_using,
                         get_z3_model,

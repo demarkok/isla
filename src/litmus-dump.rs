@@ -232,6 +232,7 @@ fn isla_main() -> i32 {
         remove_uninteresting_translates: None,
         pc_limit: None,
         pc_limit_mode: PCLimitMode::Error,
+        engine: None,
     };
 
     let setup = run_litmus::run_litmus_setup::<B64, _, ()>(&opts, &litmus, &iarch_config, |_| true).unwrap();

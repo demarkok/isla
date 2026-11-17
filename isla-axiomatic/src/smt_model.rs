@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-use crate::sexp::{DefineFun, InterpretEnv, InterpretError, InterpretResult, LambdaFun, Sexp, SexpVal};
+use crate::sexp::{DefineFun, InterpretEnv, InterpretError, InterpretResult, LambdaFun, Sexp, SexpRelation, SexpVal};
 use crate::sexp_lexer::{SexpLexer, Tok};
 use crate::sexp_parser::SexpParser;
 use isla_lib::lexer::LexError;
@@ -219,6 +219,17 @@ impl<'s, 'ev, B: BV> Model<'s, 'ev, B> {
         }
     }
 
+    /// The arity of a function in the model
+    pub fn arity(&self, f: &str) -> Option<usize> {
+        match self.functions.get(f)? {
+            SmtFn::Lambda(lf) => Some(lf.params.len()),
+            SmtFn::Fixed(SexpVal::Relation(SexpRelation::UnaryRelation(..))) => Some(1),
+            SmtFn::Fixed(SexpVal::Relation(SexpRelation::BinaryRelation(..))) => Some(2),
+            SmtFn::Fixed(SexpVal::Relation(SexpRelation::EmptyRelation(false))) => Some(1), // arity unspecified
+            SmtFn::Fixed(_) => None,
+        }
+    }
+
     /// Gives an entire relation as a Vec<(event,event)>
     pub fn interpret_rel(&mut self, f: &str) -> Result<Vec<(&'ev str, &'ev str)>, InterpretError<'s>> {
         let evs: Vec<&str> = self.env.events.keys().copied().collect();
@@ -234,6 +245,22 @@ impl<'s, 'ev, B: BV> Model<'s, 'ev, B> {
             }
         }
         Ok(rel)
+    }
+
+    /// Gives an entire set as a Vec<event>
+    pub fn interpret_set(&mut self, f: &str) -> Result<Vec<&'ev str>, InterpretError<'s>> {
+        let evs: Vec<&str> = self.env.events.keys().copied().collect();
+        let mut set = vec![];
+        for ev in evs {
+            let b = self
+                .interpret(f, &[SexpVal::Event(ev)])?
+                .into_bool()
+                .ok_or(InterpretError::not_found(f.to_string()))?;
+            if b {
+                set.push(ev);
+            }
+        }
+        Ok(set)
     }
 }
 

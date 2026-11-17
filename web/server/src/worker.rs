@@ -328,6 +328,7 @@ fn handle_request() -> Result<Response, Box<dyn Error>> {
         armv8_page_tables: req.armv8_page_tables,
         merge_translations: if req.merge_translations { Some(req.merge_split_stages) } else { None },
         remove_uninteresting_translates: if req.remove_uninteresting { Some(true) } else { None },
+        engine: None,
     };
 
     let graph_opts = GraphOpts {
@@ -358,6 +359,7 @@ fn handle_request() -> Result<Response, Box<dyn Error>> {
         &mm_compiled,
         &mm_symtab,
         &accessors,
+        &[],
         &[],
         Some("(then dt2bv qe simplify bv)"),
         true,

@@ -573,7 +573,6 @@ impl<'a> Iterator for Shows<'a> {
                     } else {
                         self.show = 0;
                         self.def += 1;
-                        break;
                     }
                 }
                 Some(_) => self.def += 1,
