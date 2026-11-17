@@ -1,0 +1,14 @@
+{
+  "name": "isla-coln-engine",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@coln-project/interface": "link:./coln/packages/coln-js-interface",
+    "@coln-project/node-runtime": "link:./coln/packages/coln-node-runtime"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.0.0"
+  }
+}

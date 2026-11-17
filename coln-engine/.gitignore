@@ -1,0 +1,9 @@
+# symlink to a built Coln checkout (see README.md)
+/coln
+# installed and compiled
+node_modules/
+dist/
+# generated from aarch64-offline.coln by the Coln compiler
+/AArch64.ts
+/AArch64.json
+/AArch64.pretty
